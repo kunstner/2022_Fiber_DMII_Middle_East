@@ -297,7 +297,7 @@ p16s_alpha
 
 # ps_genus <- tax_glom(physeq = ps_16s, taxrank = "Genus")
 ps_ra <- transform_sample_counts(ps_16s, function(x){x / sum(x)})
-ps_clr <- microbiome::transform(ps_genus, "clr")
+ps_clr <- microbiome::transform(ps_16s, "clr")
 
 sample_data(ps_clr)$Prevotella <- ps_ra %>% 
     microbiome::aggregate_taxa(x = ., level = "Genus") %>%
@@ -305,7 +305,7 @@ sample_data(ps_clr)$Prevotella <- ps_ra %>%
     otu_table() %>% 
     data.frame() %>% t() 
 
-otu.table_clr <- otu_table(ps_16s) 
+otu.table_clr <- otu_table(ps_clr) 
 ps_clr_dist <- dist(otu.table_clr, method="euclidean")
 beta_16S <- ps_clr_dist
 ps_clr_ord <- phyloseq::ordinate(ps_clr, "RDA", distance = "euclidean")
@@ -532,7 +532,7 @@ sample_data(ps_clr)$Prevotella <- ps_ra %>%
     otu_table() %>% 
     data.frame() %>% t() 
 
-otu.table_clr <- otu_table(ps_its) %>% t()
+otu.table_clr <- otu_table(ps_clr) %>% t()
 ps_clr_dist <- dist(otu.table_clr, method="euclidean")
 beta_ITS <- ps_clr_dist
 ps_clr_ord <- phyloseq::ordinate(ps_clr, "RDA", distance = "euclidean")
@@ -541,7 +541,7 @@ pits_beta <- plot_ordination( physeq = ps_clr, ordination = ps_clr_ord,
     scale_color_manual(values=colv) +
     # scale_color_continuous(type = "viridis") +
     geom_point(size=3) +
-    ggtitle( paste0("RDA of Aitchison distance (Genus level)" ) ) +
+    ggtitle( paste0("RDA of Aitchison distance" ) ) +
     theme(axis.line = element_line(colour = "black"),
           legend.text = element_text(),
           legend.key = element_rect(fill = "transparent"),
@@ -725,16 +725,16 @@ summary(m2)
 
 vegan::mantel(xdis = beta_16S, ydis = beta_ITS, method = "spearman", 
               permutations = 10000, parallel = 4)
-# Mantel statistic r: -0.1771 
-# Significance: 0.94261 
+# Mantel statistic r: 0.07896 
+# Significance: 0.23538 
 vegan::mantel(xdis = beta_16S, ydis = beta_Met, method = "spearman", 
               permutations = 10000, parallel = 4)
-# Mantel statistic r: 0.1326 
-# Significance: 0.09559 
+# Mantel statistic r: 0.1382 
+# Significance: 0.074593 
 vegan::mantel(xdis = beta_ITS, ydis = beta_Met, method = "spearman", 
               permutations = 10000, parallel = 4)
-# Mantel statistic r: -0.04852 
-# Significance: 0.66813 
+# Mantel statistic r: -0.05937
+# Significance: 0.70443 
 
 cor.test(x = sample_data(ps_16s)$Shannon_16s, 
          y = sample_data(ps_its)$Shannon_ITS, 
