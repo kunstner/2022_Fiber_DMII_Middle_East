@@ -967,8 +967,8 @@ ggsave(filename = "plots_final/Suppl_Fig_5.pdf", width = 6, height = 6, plot = p
 my_list <- list()
 my_list[["Bacterial control fdr < 0.1"]] <- da_16s_healthy
 my_list[["Bacterial DM II fdr < 0.1"]] <- da_16s_diab
-my_list[["Fungal DM II fdr < 0.1"]] <- da_ITS_healthy
-my_list[["Fungal healthy fdr < 0.1"]] <- da_ITS_diab
+my_list[["Fungal healthy fdr < 0.1"]] <- da_ITS_healthy
+my_list[["Fungal DM II fdr < 0.1"]] <- da_ITS_diab
 my_list[["Metabolites control fdr < 0.1"]] <- da_met_healthy
 my_list[["Metabolites DM II fdr < 0.1"]] <- da_met_disease
 
