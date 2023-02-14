@@ -131,8 +131,8 @@ summary(cm_fold)
 gmp_fold_rel_means <- apply(X = gmp_fold_rel, MARGIN = 1, function(x) mean(x, na.rm = T))
 gmp_fold_rel_medians <- apply(X = gmp_fold_rel, MARGIN = 1, function(x) median(x, na.rm = T))
 
-which(gmp_fold_rel_means  >= 1 ) %>% length
-which(gmp_fold_rel_medians  >= 1 ) %>% length
+which(gmp_fold_rel_means  >= 2 ) %>% length
+which(gmp_fold_rel_medians  >= 2 ) %>% length
 
 p_gbm_infl <- gmp_fold_rel[names(sort(gmp_fold_rel_means, decreasing = F)), ] %>% 
     rownames_to_column(var = "var") %>% 

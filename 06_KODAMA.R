@@ -35,14 +35,14 @@ norm_m.clr <- readRDS(file = "data/norm_m.clr.RDS") %>%
 k_data <- cbind(norm_b.clr, norm_f.clr, norm_m.clr)
 sum( colSums(k_data) == 0 )
 kodama_pls_test <- list()
-kodama_pls_test[["2"]] <- KODAMA(data = k_data, FUN = "PLS-DA", f.par = 2)
-kodama_pls_test[["4"]] <- KODAMA(data = k_data, FUN = "PLS-DA", f.par = 4)
-kodama_pls_test[["6"]] <- KODAMA(data = k_data, FUN = "PLS-DA", f.par = 6)
-kodama_pls_test[["8"]] <- KODAMA(data = k_data, FUN = "PLS-DA", f.par = 8)
-kodama_pls_test[["10"]] <- KODAMA(data = k_data, FUN = "PLS-DA", f.par = 10)
-kodama_pls_test[["20"]] <- KODAMA(data = k_data, FUN = "PLS-DA", f.par = 20)
-kodama_pls_test[["50"]] <- KODAMA(data = k_data, FUN = "PLS-DA", f.par = 50)
-kodama_pls_test[["100"]] <- KODAMA(data = k_data, FUN = "PLS-DA", f.par = 100)
+kodama_pls_test[["2"]] <- KODAMA.matrix(data = k_data, FUN = "PLS-DA", f.par = 2)
+kodama_pls_test[["4"]] <- KODAMA.matrix(data = k_data, FUN = "PLS-DA", f.par = 4)
+kodama_pls_test[["6"]] <- KODAMA.matrix(data = k_data, FUN = "PLS-DA", f.par = 6)
+kodama_pls_test[["8"]] <- KODAMA.matrix(data = k_data, FUN = "PLS-DA", f.par = 8)
+kodama_pls_test[["10"]] <- KODAMA.matrix(data = k_data, FUN = "PLS-DA", f.par = 10)
+kodama_pls_test[["20"]] <- KODAMA.matrix(data = k_data, FUN = "PLS-DA", f.par = 20)
+kodama_pls_test[["50"]] <- KODAMA.matrix(data = k_data, FUN = "PLS-DA", f.par = 50)
+kodama_pls_test[["100"]] <- KODAMA.matrix(data = k_data, FUN = "PLS-DA", f.par = 100)
 
 kodama.table <-  data.frame( 
     Parameter = c(2,4,6,8,10,20,50,100), 
@@ -50,7 +50,7 @@ kodama.table <-  data.frame(
     kodama_pls_test[["6"]]$entropy, kodama_pls_test[["8"]]$entropy,
     kodama_pls_test[["10"]]$entropy, kodama_pls_test[["20"]]$entropy,
     kodama_pls_test[["50"]]$entropy, kodama_pls_test[["100"]]$entropy) ) 
-# saveRDS(object = kodama.table, file = "KODAMA.entropy.RDS")
+# saveRDS(object = kodama.table, file = "data/KODAMA.entropy.RDS")
 
 kodama.table <- readRDS(file = "data/KODAMA.entropy.RDS")
 knitr::kable(kodama.table)
@@ -58,20 +58,28 @@ knitr::kable(kodama.table)
 # Minimum Entropy?
 kodama.table %>% dplyr::filter(Entropy == min(Entropy))
 
-kodama_pls <- KODAMA(data = k_data, FUN = "PLS-DA", f.par = 2, M = 100, 
-       bagging = TRUE, dims = 4,
-       constrain = factor(cova$group) )
+kodama_pls <- KODAMA.matrix(data = k_data, 
+                            FUN = "PLS-DA", 
+                            f.par = 8, M = 100, 
+                            bagging = TRUE, dims = 4,
+                            constrain = factor(cova$group) )
 
 kodama_pls$entropy
-k.test(data = kodama_pls$pp, labels = as.numeric(factor(cova$Fiber.Content.Diet)), 
-       n = 10000)
-k.test(data = kodama_pls$pp, labels = as.numeric(factor(cova$group)), 
-       n = 10000)
 
-k_data_plot <- kodama_pls$pp %>% 
+kkplot <- KODAMA.visualization(kk = kodama_pls, method = "MDS")
+
+
+# k.test(data = kkplot, labels = as.numeric(factor(cova$Fiber.Content.Diet)), 
+       # n = 10000)
+# k.test(data = kkplot, labels = as.numeric(factor(cova$group)), 
+       # n = 10000)
+
+k_data_plot <- kkplot %>% 
     data.frame() %>% 
     dplyr::mutate(Diet = cova$Fiber.Content.Diet) %>% 
     dplyr::mutate(Group = cova$group) %>% 
+    dplyr::rename(X1 = First.Dimension) %>% 
+    dplyr::rename(X2 = Second.Dimension) %>% 
     tibble()
 
 k_data_plot %>% 

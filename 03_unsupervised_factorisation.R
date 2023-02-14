@@ -41,7 +41,7 @@ cova$group[grep(pattern = "control", x = cova$Status) ] <- "Control"
 ps_16s <- ps_16s %>% tax_glom(physeq = ., taxrank = "Genus")
 ps_its <- ps_its %>% tax_glom(physeq = ., taxrank = "Genus")
 
-bact <- otu_table(object = ps_16s) %>% t() %>% data.frame()
+bact <- otu_table(object = ps_16s) %>% data.frame()
 #colnames(bact) <- data.frame( tax_table( object = ps_16s ) )[, "Genus"]
 
 fung <- otu_table(object = ps_its) %>% t() %>% data.frame()
@@ -53,8 +53,8 @@ metabo <- metabo %>%
     column_to_rownames("Sample") 
 
 # remove taxa with low variability
-bact <- bact[ , apply(bact, 2, var) > 10 ]
-fung <- fung[ , apply(fung, 2, var) > 10 ]
+bact <- bact[ , apply(bact, 2, var) > 5 ]
+fung <- fung[ , apply(fung, 2, var) > 5 ]
 metabo <- metabo[ , apply(metabo, 2, var) > 5 ]
 
 ps_16s <- prune_taxa(taxa = colnames(bact), x = ps_16s) 
@@ -63,7 +63,7 @@ ps_its <- prune_taxa(taxa = colnames(fung), x = ps_its)
 # Normalise with CLR
 
 norm_b.clr <- microbiome::transform(x = ps_16s, transform = "clr") %>% 
-    otu_table() %>% t() %>% data.frame()
+    otu_table() %>% data.frame()
 colnames(norm_b.clr) <- data.frame( tax_table( object = ps_16s ) )[, "Genus"]
 norm_b.clr <- norm_b.clr %>% 
     rownames_to_column(var = "sample") %>%
@@ -137,11 +137,11 @@ MOFAobject <- prepare_mofa(object = MOFAobject,
 MOFAobject <- run_mofa(object = MOFAobject, 
                        outfile="MOFA2/MOFA2_trained_diabetes.hdf5", 
                        use_basilisk = TRUE)
-# Iteration 3286: time=0.01, ELBO=-14674.54, deltaELBO=-0.000 (0.00000036%), Factors=10
+# Iteration 8446: time=0.01, ELBO=-17143.42, deltaELBO=0.005 (0.00000494%), Factors=10
 # Converged!
 MOFAobject
 
-# saveRDS(object = MOFAobject, file = "MOFAobject.RDS")
+# saveRDS(object = MOFAobject, file = "data/MOFAobject.RDS")
 MOFAobject <- readRDS(file = "data/MOFAobject.RDS")
 
 p_mofa_over <- plot_data_overview(object = MOFAobject, colors = c(pals::tableau20(20)[c(2,4,6)]) )
@@ -160,7 +160,7 @@ p_mofa_variance1 <- plot_variance_explained(MOFAobject, plot_total = T)[[2]] +
     theme(axis.text.x = element_text(angle = 45, hjust = 1, size=12))
 p_mofa_variance1
 
-p_mofa_variance2 <- plot_variance_explained(MOFAobject, max_r2=50) +
+p_mofa_variance2 <- plot_variance_explained(MOFAobject, min_r2 = 0, max_r2=50) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1, size=12))
 p_mofa_variance2
 
@@ -196,7 +196,11 @@ p_cov_dia <- correlate_factors_with_covariates(object = MOFAobject, groups = "DM
                                   # return_data = TRUE,
                                   plot="log_pval", alpha = 0.01 ) 
 
-cowplot::plot_grid(p_cov_all$gtable, p_cov_ctr$gtable)
+cowplot::plot_grid(p_cov_all$gtable, p_cov_ctr$gtable, ncol = 2)
+
+correlate_factors_with_covariates(object = MOFAobject, groups = "Control", transpose = T, 
+                                  covariates = c("Diet", "Gender", "Age", "BMI"), return_data = TRUE,
+                                  plot="log_pval", alpha = 0.01 ) 
 
 # Diet ----------------------------------------------------------------
 
@@ -252,17 +256,18 @@ p_factor_vio
 p_f1_top_weights_bact <- plot_top_weights(object = MOFAobject, 
              factors = c(1), 
              view = "Bacteria", scale = TRUE,
-             nfeatures = 6)
+             nfeatures = 9)
+p_f1_top_weights_bact
 
 p_f1_weights_bact <- plot_weights(object = MOFAobject, 
              factors = c(1), view = "Bacteria", 
-             nfeatures = 6)
+             nfeatures = 9)
 
 p_f1_scatter_bact <- plot_data_scatter(object = MOFAobject, 
                   view = "Bacteria",
                   factor = 1, 
                   shape_by = "group",
-                  features = 6, alpha = 1, 
+                  features = 9, alpha = 1, 
                   add_lm = T, lm_per_group = T, dot_size = 2,
                   sign = "all",
                   color_by = "Diet" ) + 
@@ -286,7 +291,7 @@ p_f1_scatter_bact
 p_heat_bact <- plot_data_heatmap(MOFAobject, 
                   factor = 1, 
                   view = "Bacteria", 
-                  features = 6,
+                  features = 9,
                   denoise = TRUE,
                   cluster_rows = T, cluster_cols = F,
                   show_colnames = F, show_rownames = T,
@@ -318,17 +323,17 @@ p_f1_top_weights_bact + p_heat_bact +
 p_f1_top_weights_fung <- plot_top_weights(object = MOFAobject, 
                                           factor = 1, 
                                           view = "Fungi", 
-                                          nfeatures = 3)
+                                          nfeatures = 1)
 
 p_f1_weights_fung <- plot_weights(object = MOFAobject, 
                                   factor = 1, view = "Fungi", 
-                                  nfeatures = 3)
+                                  nfeatures = 1)
 
 p_f1_scatter_fung <- plot_data_scatter(MOFAobject, 
                                        view = "Fungi",
                                        factor = 1, 
                                        shape_by = "group",
-                                       features = 3, alpha = 1, 
+                                       features = 1, alpha = 1, 
                                        add_lm = T, lm_per_group = T, dot_size = 2,
                                        sign = "all",
                                        color_by = "Diet" ) + 
@@ -351,7 +356,7 @@ p_f1_scatter_fung <- plot_data_scatter(MOFAobject,
 p_heat_fung <- plot_data_heatmap(MOFAobject, 
                                  factor = 1, 
                                  view = "Fungi", 
-                                 features = 3,
+                                 features = 2,
                                  denoise = TRUE,
                                  cluster_rows = T, cluster_cols = F,
                                  show_colnames = F, show_rownames = T,
@@ -455,11 +460,11 @@ p_mofa_over +
     plot_annotation(tag_levels = 'A')
 ggsave(filename = "plots_final/Figure_3.pdf", height = 6, width = 12)
 
-# Suppl Fig 9
+# Suppl Fig 8
 cowplot::plot_grid(p_cov_all$gtable, p_cov_ctr$gtable, nrow = 1, labels = c('A', 'B'))
-ggsave(filename = "plots_final/Suppl_Fig_9.pdf", height = 4.5, width = 9.0)
+ggsave(filename = "plots_final/Suppl_Fig_8.pdf", height = 4.5, width = 9.0)
 
-# Suppl Fig 10
+# Suppl Fig 9
 layout <- "
 AABBBBBB
 "
@@ -467,19 +472,19 @@ p_f1_top_weights_bact +
     p_f1_scatter_bact +
     plot_layout(design = layout) +
     plot_annotation(tag_levels = 'A') 
-ggsave(filename = "plots_final/Suppl_Fig_10.pdf", height = 6, width = 12)
+ggsave(filename = "plots_final/Suppl_Fig_9.pdf", height = 6, width = 12)
 
-# Suppl Fig 11
+# Suppl Fig 10
 layout <- "
-AABBBBBB
+AABB
 "
 p_f1_top_weights_fung + 
     p_f1_scatter_fung +
     plot_layout(design = layout) +
     plot_annotation(tag_levels = 'A') 
-ggsave(filename = "plots_final/Suppl_Fig_11.pdf", height = 4, width = 12)
+ggsave(filename = "plots_final/Suppl_Fig_10.pdf", height = 4, width = 6)
 
-# Suppl Fig 12
+# Suppl Fig 11
 layout <- "
 AABBBB
 XXBBBB
@@ -488,4 +493,12 @@ p_f1_top_weights_meta +
     p_f1_scatter_meta +
     plot_layout(design = layout) +
     plot_annotation(tag_levels = 'A') 
-ggsave(filename = "plots_final/Suppl_Fig_12.pdf", height = 6, width = 9)
+ggsave(filename = "plots_final/Suppl_Fig_11.pdf", height = 6, width = 9)
+
+# quick check of R-values
+s1 <- c(0.81, -0.66, -0.98, -0.95, .9, -.98, -.98, -.87, -.87, -0.69, .34, -.47, -.39, -.58)
+s2 <- c(.27, -.23, -.83, .085, .27, -.57, -.081, -.22, -.066, 0.18, 0.09, 0.01, -0.054, -.3)
+wilcox.test(abs(s1), abs(s2), alternative = "greater")
+boxplot(abs(s1), abs(s2))
+
+        

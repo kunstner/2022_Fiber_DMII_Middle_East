@@ -20,38 +20,43 @@ colv <- c("steelblue", "orange")
 seed <- 42
 set.seed(seed)
 
-# Get processed data ------------------------------------------------------
+# Get data ----------------------------------------------------------------
 
-# CLR transformed data
-
-norm_b.clr <- readRDS(file = "data/norm_b.clr.RDS") %>% 
-    dplyr::select(-view) %>% 
-    dplyr::mutate(feature = gsub(pattern = "\\[", replacement = "x", x = feature) ) %>% 
-    dplyr::mutate(feature = gsub(pattern = "\\]", replacement = "x", x = feature) ) %>% 
-    pivot_wider(data = ., names_from = feature, values_from = value) %>% 
-    column_to_rownames('sample')
-
-norm_f.clr <- readRDS(file = "data/norm_f.clr.RDS") %>% 
-    dplyr::select(-view) %>% 
-    pivot_wider(data = ., names_from = feature, values_from = value) %>% 
-    column_to_rownames('sample')
-
-norm_m.clr <- readRDS(file = "data/norm_m.clr.RDS") %>% 
-    dplyr::select(-view) %>% 
-    pivot_wider(data = ., names_from = feature, values_from = value) %>% 
-    column_to_rownames('sample')
-
+ps_16s <- readRDS(file = "data/processed_ps_16s.RDS")
+ps_its <- readRDS(file = "data/processed_ps_its.RDS")
+metabo <- readRDS(file = "data/processed_metabo.RDS")
 cova   <- readRDS(file = "data/processed_cova.RDS")
 
-rownames(norm_b.clr) == cova$Sample
-rownames(norm_f.clr) == cova$Sample
-rownames(norm_m.clr) == cova$Sample
+ps_16s <- ps_16s %>% tax_glom(physeq = ., taxrank = "Genus")
+ps_its <- ps_its %>% tax_glom(physeq = ., taxrank = "Genus")
 
-# clean up data
-norm_b.clr <- norm_b.clr[, -grep(pattern = "f__|o__|c__|p__|x", x = colnames(norm_b.clr))]
-norm_b.clr <- norm_b.clr[, order(colnames(norm_b.clr))]
+bact <- otu_table(object = ps_16s) %>% data.frame()
+fung <- otu_table(object = ps_its) %>% t() %>% data.frame()
 
-norm_m.clr <- norm_m.clr[, order(colnames(norm_m.clr))]
+rownames(bact) == rownames(fung) 
+
+metabo <- metabo %>% 
+    column_to_rownames("Sample") 
+
+# remove taxa with low variability
+bact <- bact[ , apply(bact, 2, var) > 10 ]
+fung <- fung[ , apply(fung, 2, var) > 10 ]
+metabo <- metabo[ , apply(metabo, 2, var) > 10 ]
+
+ps_16s <- prune_taxa(taxa = colnames(bact), x = ps_16s) 
+ps_its <- prune_taxa(taxa = colnames(fung), x = ps_its) 
+
+# Normalise with CLR
+
+norm_b.clr <- microbiome::transform(x = ps_16s, transform = "clr") %>% 
+    otu_table() %>% data.frame()
+colnames(norm_b.clr) <- data.frame( tax_table( object = ps_16s ) )[, "Genus"]
+
+norm_f.clr <- microbiome::transform(x = ps_its, transform = "clr") %>% 
+    otu_table() %>% t() %>% data.frame()
+colnames(norm_f.clr) <- data.frame( tax_table( object = ps_its ) )[, "Genus"]
+
+norm_m.clr <- as.data.frame( compositions::clr(metabo+0.1))
 
 # Correlations ------------------------------------------------------------
 
@@ -216,7 +221,7 @@ df_16S_ITS <- rbind(df_low, df_high)
 # Plots -------------------------------------------------------------------
 
 p_corr_bact <- df_16S %>% 
-    # dplyr::filter( abs(rho) > 0.3 ) %>% 
+    dplyr::filter( abs(rho) > 0.3 ) %>%
     dplyr::filter( pvalue < 0.01 ) %>% 
     arrange(Metabolite) %>% 
     dplyr::mutate(Metabolite = gsub(pattern = "U6\\.", replacement = "U6", x = Metabolite)) %>% 
@@ -249,7 +254,7 @@ p_corr_bact <- df_16S %>%
 p_corr_bact
 
 p_corr_fung <- df_ITS %>% 
-    # dplyr::filter( abs(rho) > 0.3 ) %>% 
+    dplyr::filter( abs(rho) > 0.3 ) %>%
     dplyr::filter( pvalue < 0.01 ) %>% 
     arrange(Metabolite) %>% 
     dplyr::mutate(Metabolite = gsub(pattern = "U6\\.", replacement = "U6", x = Metabolite)) %>% 
@@ -283,7 +288,7 @@ p_corr_fung
 
 
 p_corr_bact_fung <- df_16S_ITS %>% 
-    # dplyr::filter( abs(rho) > 0.3 ) %>% 
+    dplyr::filter( abs(rho) > 0.3 ) %>%
     dplyr::filter( pvalue < 0.01 ) %>% 
     arrange(Fungi) %>% 
     dplyr::mutate(Fungi = gsub(pattern = "_", replacement = " ", x = Fungi)) %>% 
@@ -316,8 +321,8 @@ p_corr_bact_fung <- df_16S_ITS %>%
 p_corr_bact_fung + ggtitle('Correlations 16S vs ITS ( p < 0.01)')
 
 layout <- "
-AAACCC
-BBXCCC
+AACCC
+BXCCC
 "
 p2 <- p_corr_bact + theme(legend.position = "none") + labs(title = "Bacteriome vs Metabolites", x = "", y = "") +
     p_corr_fung + theme(legend.position = "none") + labs(title = "Mycobiome vs Metabolites", x = "", y = "") +
@@ -326,6 +331,6 @@ p2 <- p_corr_bact + theme(legend.position = "none") + labs(title = "Bacteriome v
     plot_annotation(tag_levels = 'A') +
     plot_annotation(title = 'Correlations healthy cohort (p < 0.01)') 
 p2 + plot_annotation(title = '') 
-ggsave(filename = "plots_final/Suppl_Fig_8.pdf", width = 15, height = 9, 
+ggsave(filename = "plots_final/Suppl_Fig_7.pdf", width = 15, height = 9, 
        plot = p2 + plot_annotation(title = '') )
 

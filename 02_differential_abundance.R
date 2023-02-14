@@ -95,9 +95,8 @@ aldex_16s_healthy %>%
 # perform the analysis 
 da_ancombc <- ancombc(
     phyloseq = ps_16s_data, 
-    formula = "Diet", group = "Diet", 
+    formula = "Diet", group = "Diet", tax_level = "Genus",
     p_adj_method = "BH", alpha = qcutoff, 
-    zero_cut = 1, # no prev filtering necessary anymore 
     lib_cut = 0, struc_zero = TRUE, neg_lb = FALSE, tol = 1e-5, max_iter = 10000, 
     conserve = TRUE, # recommended if the sample size is small 
     global = FALSE
@@ -205,7 +204,9 @@ summarise(da_16s_healthy, across(where(is.logical), sum)) %>%
 da_16s_healthy_2 <- da_16s_healthy %>% 
     dplyr::filter(score >= 2) %>% 
     dplyr::mutate(genus = gsub(pattern = "\\[|\\]", replacement = ".", x = genus)) %>% 
-    dplyr::mutate(genus = gsub(pattern = "unclassified", replacement = "uncl.", x = genus))
+    dplyr::mutate(genus = gsub(pattern = "unclassified", replacement = "uncl.", x = genus)) %>% 
+    dplyr::mutate(genus = gsub(pattern = "-", replacement = ".", x = genus)) %>% 
+    dplyr::arrange(genus)
 
 plot_data <- ps_16s_data %>% 
     microbiome::abundances(x = ., transform = "compositional") %>% 
@@ -278,9 +279,8 @@ aldex_16s_diab %>%
 # perform the analysis 
 da_ancombc <- ancombc(
     phyloseq = ps_16s_data, 
-    formula = "Diet", group = "Diet", 
+    formula = "Diet", group = "Diet", tax_level = "Genus",
     p_adj_method = "BH", alpha = qcutoff, 
-    zero_cut = 1, # no prev filtering necessary anymore 
     lib_cut = 0, struc_zero = TRUE, neg_lb = FALSE, tol = 1e-5, max_iter = 10000, 
     conserve = TRUE, # recommended if the sample size is small 
     global = FALSE
@@ -388,37 +388,6 @@ summarise(da_16s_diab, across(where(is.logical), sum)) %>%
 da_16s_diab_2 <- da_16s_diab %>% 
     dplyr::filter(score >= 1)
 
-plot_data <- ps_16s_data %>% 
-    microbiome::abundances(x = ., transform = "compositional") %>% 
-    otu_table(taxa_are_rows = T) %>% t()%>% data.frame() 
-plot_data$Diet <- ps_16s_data %>% sample_data() %>% data.frame() %>% .$Diet
-
-p_16s_diab <- purrr::pmap(dplyr::select(da_16s_diab_2, genus, score), function(genus, score) {
-    ggplot(plot_data, aes_string("Diet", genus)) +
-        geom_boxplot(aes(fill = Diet), outlier.shape = NA, fill = colv, width = 0.4) +
-        geom_jitter(width = 0.2, alpha = 0.5) +
-        ggtitle(glue::glue("Score {score}")) +
-        theme(axis.line = element_line(colour = "black"),
-              legend.text = element_text(),
-              legend.key = element_rect(fill = "transparent"),
-              legend.position = "none",
-              panel.grid.major = element_blank(),
-              panel.grid.minor = element_blank(),
-              panel.border = element_blank(),
-              panel.background = element_blank(),
-              axis.text.x = element_text(angle = 0, size=12),
-              #axis.text.x = element_blank(),
-              axis.text.y = element_text(size=12),
-              axis.title.y = element_text(size=12, face = "italic"),
-              axis.ticks.x = element_blank(),
-              strip.background = element_rect(colour="white", fill="grey95", size=1.5, linetype="solid"))
-})
-
-p_16s_diab_final <- wrap_plots(p_16s_diab, ncol = 3) + 
-    plot_layout(ncol = 3) +
-    plot_annotation(tag_levels = 'A') +
-    plot_annotation(title = 'Differential abundance analysis 16S rRNA DMII group') 
-
 # ITS: DA Control Group --------------------------------------------------------
 
 ps_ITS_data <- ps_its_g %>% subset_samples(physeq = ., Disease == "Healthy")
@@ -458,9 +427,8 @@ aldex_ITS_healthy %>%
 # perform the analysis 
 da_ancombc <- ancombc(
     phyloseq = ps_ITS_data, 
-    formula = "Diet", group = "Diet", 
+    formula = "Diet", group = "Diet", tax_level = "Genus",
     p_adj_method = "BH", alpha = qcutoff, 
-    zero_cut = 1, # no prev filtering necessary anymore 
     lib_cut = 0, struc_zero = TRUE, neg_lb = FALSE, tol = 1e-5, max_iter = 10000, 
     conserve = TRUE, # recommended if the sample size is small 
     global = FALSE
@@ -568,40 +536,6 @@ da_ITS_healthy_2 <- da_ITS_healthy %>%
     dplyr::filter(score >= 2) %>% 
     dplyr::mutate(genus = gsub(pattern = "unclassified", replacement = "uncl.", x = genus))
 
-plot_data <- ps_ITS_data %>% 
-    microbiome::abundances(x = ., transform = "compositional") %>% 
-    otu_table(taxa_are_rows = T) %>% 
-    t()%>% 
-    data.frame() 
-plot_data$Diet <- ps_ITS_data %>% sample_data() %>% data.frame() %>% .$Diet
-colnames(plot_data) <- gsub(pattern = "unclassified", replacement = "uncl.", x = colnames(plot_data))
-
-p_ITS_healthy <- purrr::pmap(dplyr::select(da_ITS_healthy_2, genus, score), function(genus, score) {
-    ggplot(plot_data, aes_string("Diet", genus)) +
-        geom_boxplot(aes(fill = Diet), outlier.shape = NA, fill = colv, width = 0.4) +
-        geom_jitter(width = 0.2, alpha = 0.5) +
-        ggtitle(glue::glue("Score {score}")) +
-        theme(axis.line = element_line(colour = "black"),
-              legend.text = element_text(),
-              legend.key = element_rect(fill = "transparent"),
-              legend.position = "none",
-              panel.grid.major = element_blank(),
-              panel.grid.minor = element_blank(),
-              panel.border = element_blank(),
-              panel.background = element_blank(),
-              axis.text.x = element_text(angle = 0, size=12),
-              #axis.text.x = element_blank(),
-              axis.text.y = element_text(size=12),
-              axis.title.y = element_text(size=12, face = "italic"),
-              axis.ticks.x = element_blank(),
-              strip.background = element_rect(colour="white", fill="grey95", size=1.5, linetype="solid"))
-})
-
-p_ITS_healthy_final <- wrap_plots(p_ITS_healthy) + 
-    plot_layout(ncol = 1) +
-    plot_annotation(tag_levels = 'A') +
-    plot_annotation(title = 'Differential abundance analysis ITS rRNA healthy group') 
-
 # ITS: DA DM II Group --------------------------------------------------------
 
 ps_ITS_data <- ps_its_g %>% subset_samples(physeq = ., Disease == "DM II")
@@ -641,9 +575,8 @@ aldex_ITS_diab %>%
 # perform the analysis 
 da_ancombc <- ancombc(
     phyloseq = ps_ITS_data, 
-    formula = "Diet", group = "Diet", 
+    formula = "Diet", group = "Diet", tax_level = "Genus",
     p_adj_method = "BH", alpha = qcutoff, 
-    zero_cut = 1, # no prev filtering necessary anymore 
     lib_cut = 0, struc_zero = TRUE, neg_lb = FALSE, tol = 1e-5, max_iter = 10000, 
     conserve = TRUE, # recommended if the sample size is small 
     global = FALSE
@@ -790,7 +723,6 @@ da_ancombc <- ancombc(
     phyloseq = ps_met_data, 
     formula = "Diet", group = "Diet", 
     p_adj_method = "BH", alpha = qcutoff, 
-    zero_cut = 1, # no prev filtering necessary anymore 
     lib_cut = 0, struc_zero = TRUE, neg_lb = FALSE, tol = 1e-5, max_iter = 10000, 
     conserve = TRUE, # recommended if the sample size is small 
     global = FALSE
@@ -856,13 +788,16 @@ summarise(da_met_healthy, across(where(is.logical), sum)) %>%
     knitr::kable()
 
 da_met_healthy_2 <- da_met_healthy %>% 
-    dplyr::filter(score >= 2)
+    dplyr::filter(score >= 2) %>% 
+    dplyr::arrange(metabolite)
+da_met_healthy_2$metabolite[da_met_healthy_2$metabolite == "Proprionate"] <- "Propionate"
 
 plot_data <- ps_met_data %>% 
     # microbiome::abundances(x = ., transform = "compositional") %>% 
     otu_table(taxa_are_rows = T) %>% 
     # t() %>% 
-    data.frame() 
+    data.frame() %>% 
+    rename(Propionate = Proprionate) 
 plot_data$Diet <- ps_met_data %>% sample_data() %>% data.frame() %>% .$Diet
 
 p_met_healthy <- purrr::pmap(dplyr::select(da_met_healthy_2, metabolite, score), function(metabolite, score) {
@@ -931,7 +866,6 @@ da_ancombc <- ancombc(
     phyloseq = ps_met_data, 
     formula = "Diet", group = "Diet", 
     p_adj_method = "BH", alpha = qcutoff, 
-    zero_cut = 1, # no prev filtering necessary anymore 
     lib_cut = 0, struc_zero = TRUE, neg_lb = FALSE, tol = 1e-5, max_iter = 10000, 
     conserve = TRUE, # recommended if the sample size is small 
     global = FALSE
@@ -1025,15 +959,10 @@ p_16s_healthy_final <- wrap_plots(p_16s_healthy, ncol = 3) +
     plot_annotation(tag_levels = 'A')
 ggsave(filename = "plots_final/Suppl_Fig_4.pdf", width = 9, height = 9, plot = p_16s_healthy_final)
 
-p_ITS_healthy_final <- wrap_plots(p_ITS_healthy) + 
-    plot_layout(ncol = 1) +
-    plot_annotation(tag_levels = 'A')
-ggsave(filename = "plots_final/Suppl_Fig_5.pdf", width = 3, height = 3, plot = p_ITS_healthy_final)
-
 p_met_healthy_final <- wrap_plots(p_met_healthy) +
-    plot_layout(ncol = 3) +
+    plot_layout(ncol = 2) +
     plot_annotation(tag_levels = 'A')
-ggsave(filename = "plots_final/Suppl_Fig_6.pdf", width = 9, height = 6, plot = p_met_healthy_final)
+ggsave(filename = "plots_final/Suppl_Fig_5.pdf", width = 6, height = 6, plot = p_met_healthy_final)
 
 my_list <- list()
 my_list[["Bacterial control fdr < 0.1"]] <- da_16s_healthy
