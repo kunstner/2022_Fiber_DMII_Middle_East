@@ -135,6 +135,7 @@ which(gmp_fold_rel_means  >= 2 ) %>% length
 which(gmp_fold_rel_medians  >= 2 ) %>% length
 
 p_gbm_infl <- gmp_fold_rel[names(sort(gmp_fold_rel_means, decreasing = F)), ] %>% 
+    data.frame() %>% 
     rownames_to_column(var = "var") %>% 
     dplyr::filter(var %in% names(which(gmp_fold_rel_means  >= 2 ))) %>% 
     dplyr::mutate(var = gsub(pattern = "B_", replacement = "B: ", x = var)) %>% 
@@ -152,14 +153,14 @@ p_gbm_infl <- gmp_fold_rel[names(sort(gmp_fold_rel_means, decreasing = F)), ] %>
              add = "boxplot", add.params = list(color="grey35", size=0.5)) +
     ylim(0, 100) +
     labs(x = "", y = "Relative influence (%)") +
-    ggplot2::annotate(geom = "text", x = 4, y = 75,  
-                      label = paste0("Accuracy: ",
-                                     round( mean(cm_fold$Accuracy, na.rm = T), 2 ) ), 
-                      hjust = 0, parse = TRUE) +
-    ggplot2::annotate(geom = "text", x = 3, y = 75,  
-                      label = paste0("kappa: ",
-                                     round( mean(cm_fold$Kappa, na.rm = T), 2 ) ), 
-                      hjust = 0, parse = TRUE) +
+    # ggplot2::annotate(geom = "text", x = 4, y = 75,  
+    #                   label = paste0("Accuracy: ",
+    #                                  round( mean(cm_fold$Accuracy, na.rm = T), 2 ) ), 
+    #                   hjust = 0, parse = TRUE) +
+    # ggplot2::annotate(geom = "text", x = 3, y = 75,  
+    #                   label = paste0("kappa: ",
+    #                                  round( mean(cm_fold$Kappa, na.rm = T), 2 ) ), 
+    #                   hjust = 0, parse = TRUE) +
     theme(axis.line = element_line(colour = "black"),
           legend.text = element_text(face = "italic"),
           legend.justification = "top",
@@ -202,11 +203,9 @@ p_gbm_metrics <- cm_fold %>%
 
 layout <- "
 AAAB
-AAAB
-AAAB
-AAAB
 "
 p_gbm_infl + p_gbm_metrics +
     plot_layout(design = layout) +
     plot_annotation(tag_levels = 'A') +
     plot_annotation(title = 'Healthy: Gradient Boosting Machine (1,000 iterations)') 
+ggsave(filename = "plots_final/Suppl_Fig_12.pdf", width = 12, height = 6 )

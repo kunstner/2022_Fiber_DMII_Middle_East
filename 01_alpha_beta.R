@@ -21,6 +21,16 @@ ps_its <- readRDS(file = "data/processed_ps_its.RDS")
 metabo <- readRDS(file = "data/processed_metabo.RDS")
 cova   <- readRDS(file = "data/processed_cova.RDS")
 
+# save data for ena submission
+WriteXLS::WriteXLS(x = list(
+    Bacteriome = ps_16s %>% 
+        sample_data() %>% 
+        data.frame(),
+    Mycobiome = ps_its %>% 
+        sample_data() %>% 
+        data.frame()), ExcelFileName = "../ena_submission/ena_data.xlsx", 
+    FreezeRow = 1, BoldHeaderRow = T)
+
 ps_met <-phyloseq(otu_table(object = metabo %>% 
                                 column_to_rownames("Sample"), 
                             taxa_are_rows = F), 
@@ -336,6 +346,15 @@ beta_df <- vegan::adonis2(formula = ps_clr_dist ~ Diet * Disease + Prevotella + 
     rownames_to_column("Variable")
 beta_df
 
+ft_beta16S <- beta_df %>% 
+    # dplyr::mutate(Variable = gsub(pattern = "_", replacement = " ", x = Variable)) %>% 
+    dplyr::select(Variable, Df, SumOfSqs, R2, F, p.value = 'Pr..F.') %>% 
+    dplyr::mutate(SumOfSqs = round(SumOfSqs, 2)) %>% 
+    dplyr::mutate(R2 = round(R2, 4)) %>% 
+    dplyr::mutate(F = round(F, 4)) %>% 
+    flextable::flextable()
+
+
 # no correlation Shannon's H and Prevotella
 cor.test(p16s_beta$data$Shannon_16s, p16s_beta$data$Prevotella, method = 'spearman')
 
@@ -563,6 +582,14 @@ beta_df_its <- vegan::adonis2(formula = ps_clr_dist ~ Diet * Disease + Prevotell
     rownames_to_column("Variable")
 beta_df_its
 
+ft_betaITS <- beta_df_its %>% 
+    # dplyr::mutate(Variable = gsub(pattern = "_", replacement = " ", x = Variable)) %>% 
+    dplyr::select(Variable, Df, SumOfSqs, R2, F, p.value = 'Pr..F.') %>% 
+    dplyr::mutate(SumOfSqs = round(SumOfSqs, 2)) %>% 
+    dplyr::mutate(R2 = round(R2, 4)) %>% 
+    dplyr::mutate(F = round(F, 4)) %>% 
+    flextable::flextable()
+
 m1 <- lm(PC1 ~ Diet * Disease + Prevotella + Shannon_ITS + Shannon_16s + Age + Gender + BMI, data = pits_beta$data)
 m2 <- lm(PC2 ~ Diet * Disease + Prevotella + Shannon_ITS + Shannon_16s + Age + Gender + BMI, data = pits_beta$data)
 summary(m1)
@@ -716,6 +743,14 @@ beta_df_met <- vegan::adonis2(formula = ps_clr_dist ~ Diet * Disease + Prevotell
     rownames_to_column("Variable")
 beta_df_met
 
+ft_betaMetabolome <- beta_df_met %>% 
+    # dplyr::mutate(Variable = gsub(pattern = "_", replacement = " ", x = Variable)) %>% 
+    dplyr::select(Variable, Df, SumOfSqs, R2, F, p.value = 'Pr..F.') %>% 
+    dplyr::mutate(SumOfSqs = round(SumOfSqs, 2)) %>% 
+    dplyr::mutate(R2 = round(R2, 4)) %>% 
+    dplyr::mutate(F = round(F, 4)) %>% 
+    flextable::flextable()
+
 m1 <- lm(PC1 ~ Diet * Disease + Prevotella + Shannon_Metabolome + Age + Gender + BMI, data = pmet_beta$data)
 m2 <- lm(PC2 ~ Diet * Disease + Prevotella + Shannon_Metabolome + Age + Gender + BMI, data = pmet_beta$data)
 summary(m1)
@@ -811,3 +846,7 @@ p_bmi_1 + theme( axis.text.x = element_text(angle = 0, hjust = 0.5, size=12) ) +
     plot_layout(design = layout) +
     plot_annotation(tag_levels = 'A') 
 # ggsave(filename = "plots_final/Suppl_Fig_BMI.pdf", height = 4.5, width = 9)
+
+flextable::save_as_image(x = ft_beta16S,path = 'table/beta_16S.png')
+flextable::save_as_image(x = ft_betaITS,path = 'table/beta_ITS.png')
+flextable::save_as_image(x = ft_betaMetabolome,path = 'table/beta_Met.png')

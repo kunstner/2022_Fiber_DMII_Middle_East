@@ -137,6 +137,7 @@ which(gmp_fold_rel_means  >= 2 ) %>% length
 which(gmp_fold_rel_medians  >= 2 ) %>% length
 
 p_gbm_infl <- gmp_fold_rel[names(sort(gmp_fold_rel_means, decreasing = F)), ] %>% 
+    data.frame() %>% 
     rownames_to_column(var = "var") %>% 
     dplyr::filter(var %in% names(which(gmp_fold_rel_means  >= 2 ))) %>% 
     dplyr::mutate(var = gsub(pattern = "B_", replacement = "B: ", x = var)) %>% 
@@ -203,11 +204,10 @@ p_gbm_metrics <- cm_fold %>%
 
 layout <- "
 AAAB
-AAAB
-AAAB
-AAAB
 "
 p_gbm_infl + p_gbm_metrics +
     plot_layout(design = layout) +
     plot_annotation(tag_levels = 'A') +
     plot_annotation(title = 'DM II: Gradient Boosting Machine (1,000 iterations)') 
+ggsave(filename = "plots_final/Suppl_Fig_13.pdf", width = 12, height = 6 )
+
