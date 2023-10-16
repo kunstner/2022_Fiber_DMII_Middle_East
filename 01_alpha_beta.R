@@ -16,20 +16,26 @@ colv <- c("steelblue", "orange")
 
 # Get processed data ------------------------------------------------------
 
-ps_16s <- readRDS(file = "data/processed_ps_16s.RDS")
-ps_its <- readRDS(file = "data/processed_ps_its.RDS")
-metabo <- readRDS(file = "data/processed_metabo.RDS")
-cova   <- readRDS(file = "data/processed_cova.RDS")
+ps_16s <- readRDS(file = "processed_ps_16s.RDS")
+ps_its <- readRDS(file = "processed_ps_its.RDS")
+metabo <- readRDS(file = "processed_metabo.RDS")
+cova   <- readRDS(file = "processed_cova.RDS")
 
-# save data for ena submission
-WriteXLS::WriteXLS(x = list(
-    Bacteriome = ps_16s %>% 
-        sample_data() %>% 
-        data.frame(),
-    Mycobiome = ps_its %>% 
-        sample_data() %>% 
-        data.frame()), ExcelFileName = "../ena_submission/ena_data.xlsx", 
-    FreezeRow = 1, BoldHeaderRow = T)
+suppl_table <- cova %>% 
+    dplyr::select(Sample, Status, Gender, Age, 
+                  Diet_Fiber = Fiber.Content.Diet, BMI = BMI..Kg.m) %>% 
+    dplyr::mutate(Status = case_when(
+        Status == 'control' ~ 'Healthy',
+        Status == 'disease' ~ 'T2D',
+    )) %>% 
+    dplyr::mutate(Diet_Fiber = case_when(
+        Diet_Fiber == 'High fiber diet' ~ 'High',
+        Diet_Fiber == 'Low fiber diet' ~ 'Low',
+    ))
+
+WriteXLS::WriteXLS(x = suppl_table, ExcelFileName = "Suppl_Table_cova.xlsx", 
+                   SheetNames = 'Cohort', 
+                   row.names = F, AdjWidth = T, BoldHeaderRow = T, FreezeRow = 1)
 
 ps_met <-phyloseq(otu_table(object = metabo %>% 
                                 column_to_rownames("Sample"), 
@@ -47,6 +53,9 @@ sample_data(ps_its)$Var <- paste(sample_data(ps_its)$Disease, sample_data(ps_its
 sample_data(ps_met)$Var <- paste(sample_data(ps_met)$Disease, sample_data(ps_met)$Diet)
 
 # Age ---------------------------------------------------------------------
+
+table(cova$Status, cova$Fiber.Content.Diet)
+table(cova$Gender, cova$Fiber.Content.Diet)
 
 p_age_1 <- ps_16s %>% 
     sample_data() %>% 
@@ -71,8 +80,7 @@ p_age_1 <- ps_16s %>%
           axis.text = element_text(size=12),
           axis.text.y = element_text(size=12),
           axis.ticks.x = element_blank(),
-          strip.background = element_rect(colour="white", fill="grey95", 
-                                          linewidth = 1.5, linetype="solid"))
+          strip.background = element_rect(colour="white", fill="grey95", size=1.5, linetype="solid"))
 p_age_1
 
 p_age_2 <- ps_16s %>% 
@@ -99,9 +107,10 @@ p_age_2 <- ps_16s %>%
           axis.text = element_text(size=12),
           axis.text.y = element_text(size=12),
           axis.ticks.x = element_blank(),
-          strip.background = element_rect(colour="white", fill="grey95", 
-                                          linewidth = 1.5, linetype="solid"))
+          strip.background = element_rect(colour="white", fill="grey95", size=1.5, linetype="solid"))
 p_age_2
+ggsave(filename = "plots/age.pdf", width = 4, height = 6)
+
 
 p_bmi_1 <- ps_16s %>% 
     sample_data() %>% 
@@ -160,27 +169,18 @@ ps_16s %>%
     sample_data() %>% 
     data.frame() %>% 
     group_by(Disease) %>% 
-    summarise(mean_Age = mean(Age), sd_Age = sd(Age),
-              mean_BMI = mean(BMI), sd_BMI = sd(BMI)) 
-
-wilcox.test(BMI ~ Disease, data = ps_16s %>% 
-                sample_data() %>% 
-                data.frame(), exact = FALSE)
-
-table(cova$Status, cova$Fiber.Content.Diet)
-table(cova$Gender, cova$Fiber.Content.Diet)
-
-# Top 5 taxa --------------------------------------------------------------
+    summarise(mean_BMI = mean(BMI), sd_BMI = sd(BMI)) 
+# Top 3 taxa --------------------------------------------------------------
 
 ps_16s %>%
     microbiome::aggregate_taxa(x = ., level = "Genus") %>% 
     otu_table() %>% t() %>%
-    colSums() %>% sort(decreasing = T) %>% head( n = 6)
+    colSums() %>% sort(decreasing = T) %>% head( n = 5)
 
 ps_its %>%
     microbiome::aggregate_taxa(x = ., level = "Genus") %>% 
     otu_table() %>% t() %>%
-    colSums() %>% sort(decreasing = T) %>% head( n = 6)
+    colSums() %>% sort(decreasing = T) %>% head( n = 5)
 
 ps_met %>%
     otu_table() %>% 
@@ -196,9 +196,9 @@ p16s_phylum <- ps_16s %>%
     arrange(Phylum) %>%
     dplyr::select( Phylum, Diet, Disease, Abundance) %>%
     dplyr::group_by(Phylum, Diet, Disease) %>%
-    dplyr::reframe(mean = mean(Abundance), groups = c(Phylum)) %>%
+    dplyr::summarise(mean = mean(Abundance), groups = c(Phylum)) %>%
     unique() %>%
-    dplyr::mutate(Phylum = gsub(pattern = "_", replacement = " ", x = Phylum)) %>%
+    dplyr::mutate(Phylum = gsub(pattern = "p__", replacement = "", x = Phylum)) %>%
     ggplot(., aes(x = Diet, y = mean, fill = Phylum)) +
     facet_wrap(Disease~., scales = "free_x") +
     geom_bar(stat = "identity") +
@@ -232,22 +232,35 @@ means_genus <- ps_16s %>%
     dplyr::arrange(Genus) %>%
     dplyr::select( Genus, Diet, Disease, Abundance) %>%
     dplyr::group_by(Genus, Diet, Disease) %>%
-    dplyr::reframe(mean = mean(Abundance), groups = c(Genus)) %>%
+    dplyr::summarise(mean = mean(Abundance), groups = c(Genus)) %>%
     unique() %>%
     dplyr::mutate(Genus = gsub(pattern = "g__", replacement = "", x = Genus))
 # filter(mean >= 0.02) # Filter out low abundance taxa
 
 # summarise lowly abundant genera
-means_genus$Genus[means_genus$mean <= 0.03] <- "Other"
+means_genus$Genus[means_genus$mean <= 0.02] <- "Other"
 means_genus <- means_genus %>%
     group_by(Genus, Diet, Disease) %>%
-    reframe(mean = sum(mean), groups = c(Genus)) %>%
+    summarise(mean = sum(mean), groups = c(Genus)) %>%
     unique()
+
+means_genus$mean[means_genus$Disease=="DM II" & means_genus$Diet == "LFD" & means_genus$Genus == "Other"] <- 
+    means_genus$mean[means_genus$Disease=="DM II" & means_genus$Diet == "LFD" & means_genus$Genus == "Other"] + 
+    ( 1 - sum(means_genus$mean[means_genus$Disease=="DM II" & means_genus$Diet == "LFD"]) )
+means_genus$mean[means_genus$Disease=="DM II" & means_genus$Diet == "HFD" & means_genus$Genus == "Other"] <- 
+    means_genus$mean[means_genus$Disease=="DM II" & means_genus$Diet == "HFD" & means_genus$Genus == "Other"] + 
+    ( 1 - sum(means_genus$mean[means_genus$Disease=="DM II" & means_genus$Diet == "HFD"]) )
+
+means_genus$mean[means_genus$Disease=="Healthy" & means_genus$Diet == "LFD" & means_genus$Genus == "Other"] <- 
+    means_genus$mean[means_genus$Disease=="Healthy" & means_genus$Diet == "LFD" & means_genus$Genus == "Other"] + 
+    ( 1 - sum(means_genus$mean[means_genus$Disease=="Healthy" & means_genus$Diet == "LFD"]) )
+means_genus$mean[means_genus$Disease=="Healthy" & means_genus$Diet == "HFD" & means_genus$Genus == "Other"] <- 
+    means_genus$mean[means_genus$Disease=="Healthy" & means_genus$Diet == "HFD" & means_genus$Genus == "Other"] + 
+    ( 1 - sum(means_genus$mean[means_genus$Disease=="Healthy" & means_genus$Diet == "HFD"]) )
 
 p16s_genus <- means_genus %>% 
     dplyr::mutate(Genus = gsub(pattern = "f__", replacement = "", x = Genus)) %>% 
     dplyr::mutate(Genus = gsub(pattern = "_unclassified", replacement = " uncl.", x = Genus)) %>% 
-    dplyr::mutate(Genus = gsub(pattern = "_", replacement = " ", x = Genus)) %>% 
     ggplot(data = ., aes(x = Diet, y = mean, fill = Genus)) +
     facet_wrap(Disease~., scales = "free_x") +
     geom_bar(stat = "identity") +
@@ -255,7 +268,7 @@ p16s_genus <- means_genus %>%
     # Remove x axis title
     theme(axis.title.x = element_blank()) +
     guides(fill = guide_legend(reverse = FALSE, keywidth = 1, keyheight = 1)) +
-    ylab("Relative Abundance (Genus abundance > 3%)") +
+    ylab("Relative Abundance (Genus abundance > 2%)") +
     ggtitle("") +
     theme(axis.line = element_line(colour = "black"),
           legend.text = element_text(face = "italic"),
@@ -274,6 +287,12 @@ p16s_genus <- means_genus %>%
 p16s_genus
 
 # 16S Alpha ---------------------------------------------------------------
+
+tmp <- sample_data(ps_16s) %>% data.frame() 
+m1 <- glm(Shannon_16s ~ Age, data = tmp)
+tmp$Residuals <- residuals(m1)
+fitted(m1)
+residuals(m1)
 
 p16s_alpha <- ps_16s %>% 
     sample_data() %>% 
@@ -305,17 +324,19 @@ p16s_alpha
 
 # 16S Beta diversity ------------------------------------------------------
 
-# ps_genus <- tax_glom(physeq = ps_16s, taxrank = "Genus")
-ps_ra <- transform_sample_counts(ps_16s, function(x){x / sum(x)})
-ps_clr <- microbiome::transform(ps_16s, "clr")
+ps_genus <- tax_glom(physeq = ps_16s, taxrank = "Genus")
+ps_ra <- transform_sample_counts(ps_genus, function(x){x / sum(x)})
+ps_genus_clr <- microbiome::transform(ps_genus, "clr")
 
-sample_data(ps_clr)$Prevotella <- ps_ra %>% 
+sample_data(ps_genus_clr)$Prevotella <- ps_ra %>% 
     microbiome::aggregate_taxa(x = ., level = "Genus") %>%
-    subset_taxa(physeq = ., Genus == "Prevotella") %>% 
+    subset_taxa(physeq = ., Genus == "g__Prevotella") %>% 
     otu_table() %>% 
     data.frame() %>% t() 
 
-otu.table_clr <- otu_table(ps_clr) 
+ps_clr <- microbiome::transform(ps_16s, "clr")
+sample_data(ps_clr)$Prevotella <- sample_data(ps_genus_clr)$Prevotella
+otu.table_clr <- otu_table(ps_clr) %>% t()
 ps_clr_dist <- dist(otu.table_clr, method="euclidean")
 beta_16S <- ps_clr_dist
 ps_clr_ord <- phyloseq::ordinate(ps_clr, "RDA", distance = "euclidean")
@@ -324,7 +345,7 @@ p16s_beta <- plot_ordination( physeq = ps_clr, ordination = ps_clr_ord,
     # scale_color_manual(values=colv) +
     scale_color_continuous(type = "viridis") +
     geom_point(size=3) +
-    ggtitle( paste0("RDA (Aitchison distance)" ) ) +
+    ggtitle( paste0("RDA (Aitchison distance; genus level)" ) ) +
     theme(axis.line = element_line(colour = "black"),
           legend.text = element_text(),
           legend.key = element_rect(fill = "transparent"),
@@ -340,48 +361,42 @@ p16s_beta <- plot_ordination( physeq = ps_clr, ordination = ps_clr_ord,
           strip.background = element_rect(colour="white", fill="grey95", size=1.5, linetype="solid"))
 p16s_beta
 
-beta_df <- vegan::adonis2(formula = ps_clr_dist ~ Diet * Disease + Prevotella + Shannon_16s + Shannon_ITS + Age + Gender + BMI,
+beta_df <- vegan::adonis2(formula = ps_clr_dist ~ Diet * Disease + Prevotella + Age + Gender + BMI,
                          data = data.frame(ps_clr %>% sample_data),
                          permutations = 99999) %>% data.frame() %>%
     rownames_to_column("Variable")
 beta_df
 
-ft_beta16S <- beta_df %>% 
-    # dplyr::mutate(Variable = gsub(pattern = "_", replacement = " ", x = Variable)) %>% 
-    dplyr::select(Variable, Df, SumOfSqs, R2, F, p.value = 'Pr..F.') %>% 
-    dplyr::mutate(SumOfSqs = round(SumOfSqs, 2)) %>% 
-    dplyr::mutate(R2 = round(R2, 4)) %>% 
-    dplyr::mutate(F = round(F, 4)) %>% 
-    flextable::flextable()
-
-
-# no correlation Shannon's H and Prevotella
-cor.test(p16s_beta$data$Shannon_16s, p16s_beta$data$Prevotella, method = 'spearman')
-
 # Otu00001 -> Prevotella (tax_table(ps_genus))
 # Null model
-corncob_null <- corncob::bbdml(formula = ASV1 ~ 1, 
-                             phi.formula = ~ 1,
+corncob_null <- corncob::bbdml(formula = Otu00001 ~ Shannon_16s, 
+                             phi.formula = ~ Shannon_16s,
                              data = ps_genus %>% subset_samples(physeq = ., Disease == "Control"))
 # DA Model
-corncob_da <- corncob::bbdml(formula = ASV1 ~ Diet, 
-                          phi.formula = ~ Diet,
+corncob_da <- corncob::bbdml(formula = Otu00001 ~ Diet + Shannon_16s, 
+                          phi.formula = ~ Diet + Shannon_16s,
                           data = ps_genus %>% subset_samples(physeq = ., Disease == "Control"))
-# plot(corncob_da, color = "Var", total = F, B = 50)
+plot(corncob_da, color = "Var", total = F, B = 50)
 
 corncob::lrtest(mod_null = corncob_null, mod = corncob_da)
+corncob::waldchisq(mod = corncob_da, mod_null = corncob_null) 
+corncob::waldt(mod = corncob_da) %>% data.frame()
 
 # Null model
-corncob_null <- corncob::bbdml(formula = ASV1 ~ 1, 
-                               phi.formula = ~ 1,
+corncob_null <- corncob::bbdml(formula = Otu00001 ~ Shannon_16s, 
+                               phi.formula = ~ Shannon_16s,
                                data = ps_genus %>% subset_samples(physeq = ., Disease == "DM II"))
 # DA Model
-corncob_da <- corncob::bbdml(formula = ASV1 ~ Diet, 
-                             phi.formula = ~ Diet,
+corncob_da <- corncob::bbdml(formula = Otu00001 ~ Diet + Shannon_16s, 
+                             phi.formula = ~ Diet + Shannon_16s,
                              data = ps_genus %>% subset_samples(physeq = ., Disease == "DM II"))
-# plot(corncob_da, color = "Diet", total = F, B = 50)
+plot(corncob_da, color = "Diet", total = F, B = 50)
 
 corncob::lrtest(mod_null = corncob_null, mod = corncob_da)
+corncob::waldchisq(mod = corncob_da, mod_null = corncob_null) 
+
+df_waldt <- corncob::waldt(mod = corncob_da) %>% data.frame()
+df_waldt
 
 p16s_prevot <- p16s_beta$data %>% 
     data.frame() %>% 
@@ -404,21 +419,33 @@ p16s_prevot <- p16s_beta$data %>%
           axis.text.y = element_text(size=12),
           axis.ticks.x = element_blank(),
           strip.background = element_rect(colour="white", fill="grey95", size=1.5, linetype="solid")) +
-    labs(x = "", y = "Rel. abundances Prevotella") + ylim(-0.01,1) 
+    labs(x = "", y = "Rel. abundances Prevotella") + ylim(0,1) 
 p16s_prevot
 
-# cor.test(p16s_beta$data$PC1, p16s_beta$data$Shannon_16s, method = 'spearman')
-# cor.test(p16s_beta$data$PC2, p16s_beta$data$Shannon_16s, method = 'spearman')
+cor.test(p16s_beta$data$PC1, p16s_beta$data$Shannon_16s, method = 'spearman')
+cor.test(p16s_beta$data$PC2, p16s_beta$data$Shannon_16s, method = 'spearman')
 cor.test(p16s_beta$data$PC1, p16s_beta$data$Prevotella, method = 'spearman')
 cor.test(p16s_beta$data$PC2, p16s_beta$data$Prevotella, method = 'spearman')
-
 
 m1 <- lm(PC1 ~ Diet * Disease + Prevotella + Shannon_16s + Shannon_ITS + Age + Gender + BMI, data = p16s_beta$data)
 m2 <- lm(PC2 ~ Diet * Disease + Prevotella + Shannon_16s + Shannon_ITS + Age + Gender + BMI, data = p16s_beta$data)
 summary(m1)
 summary(m2)
 
-wilcox.test(Prevotella ~ Disease, data = p16s_beta$data, exact = FALSE)
+wilcox.test(Prevotella ~ Disease, data = p16s_beta$data)
+
+layout <- "
+ABCCDD
+ABEEEE
+"
+
+p16s_phylum + p16s_genus + 
+    p16s_alpha + p16s_prevot +
+    p16s_beta +
+    plot_layout(design = layout) +
+    plot_annotation(tag_levels = 'A') +
+    plot_annotation(title = '16S rRNA gene data') 
+ggsave(filename = "plots/plots_16s.pdf", height = 9, width = 18)
 
 # ITS Taxa plots ----------------------------------------------------------
 
@@ -430,7 +457,7 @@ pits_phylum <- ps_its %>%
     arrange(Phylum) %>%
     dplyr::select( Phylum, Diet, Disease, Abundance) %>%
     dplyr::group_by(Phylum, Diet, Disease) %>%
-    dplyr::reframe(mean = mean(Abundance), groups = c(Phylum)) %>%
+    dplyr::summarise(mean = mean(Abundance), groups = c(Phylum)) %>%
     unique() %>%
     dplyr::mutate(Phylum = gsub(pattern = "p__", replacement = "", x = Phylum)) %>%
     ggplot(., aes(x = Diet, y = mean, fill = Phylum)) +
@@ -453,31 +480,29 @@ pits_phylum <- ps_its %>%
           #axis.text.x = element_blank(),
           axis.text.y = element_text(size=12),
           axis.ticks.x = element_blank(),
-          strip.background = element_rect(colour="white", fill="grey95", 
-                                          linewidth = 1.5, linetype="solid")) +
+          strip.background = element_rect(colour="white", fill="grey95", size=1.5, linetype="solid")) +
     ylim(0,1) +
     guides(fill = guide_legend(title = "Phylum", ncol = 1))
 pits_phylum
 
 # Genera
 means_genus <- ps_its %>%
-    tax_glom(taxrank = "Genus", NArm = FALSE) %>% # agglomerate at phylum level
+    tax_glom(taxrank = "Genus") %>% # agglomerate at phylum level
     transform_sample_counts(function(x) {x/sum(x)} ) %>%
     psmelt() %>% # Melt to long format
     dplyr::arrange(Genus) %>%
     dplyr::select( Genus, Diet, Disease, Abundance) %>%
     dplyr::group_by(Genus, Diet, Disease) %>%
-    dplyr::reframe(mean = mean(Abundance)) %>%
-    unique() 
+    dplyr::summarise(mean = mean(Abundance), groups = c(Genus)) %>%
+    unique() %>%
+    dplyr::mutate(Genus = gsub(pattern = "g__", replacement = "", x = Genus))
 # filter(mean >= 0.02) # Filter out low abundance taxa
-
-means_genus %>% group_by(Diet, Disease) %>% summarise(sum = sum(mean))
 
 # summarise lowly abundant genera
 means_genus$Genus[means_genus$mean <= 0.01] <- "Other"
 means_genus <- means_genus %>%
     group_by(Genus, Diet, Disease) %>%
-    reframe(mean = sum(mean), groups = c(Genus)) %>%
+    summarise(mean = sum(mean), groups = c(Genus)) %>%
     unique()
 
 # means_genus$mean[means_genus$Disease == "DM II" & means_genus$Diet == "HFD"] %>% sum()
@@ -511,6 +536,12 @@ pits_genus <- means_genus %>%
 pits_genus
 
 # ITS Alpha ---------------------------------------------------------------
+
+tmp <- sample_data(ps_its) %>% data.frame() 
+m1 <- glm(Shannon_ITS ~ Age, data = tmp)
+tmp$Residuals <- residuals(m1)
+fitted(m1)
+residuals(m1)
 
 pits_alpha <- ps_its %>% 
     sample_data() %>% 
@@ -547,7 +578,7 @@ ps_clr <- microbiome::transform(ps_its, "clr")
 
 sample_data(ps_clr)$Prevotella <- ps_ra %>% 
     microbiome::aggregate_taxa(x = ., level = "Genus") %>%
-    subset_taxa(physeq = ., Genus == "Prevotella") %>% 
+    subset_taxa(physeq = ., Genus == "g__Prevotella") %>% 
     otu_table() %>% 
     data.frame() %>% t() 
 
@@ -560,7 +591,7 @@ pits_beta <- plot_ordination( physeq = ps_clr, ordination = ps_clr_ord,
     scale_color_manual(values=colv) +
     # scale_color_continuous(type = "viridis") +
     geom_point(size=3) +
-    ggtitle( paste0("RDA of Aitchison distance" ) ) +
+    ggtitle( paste0("RDA of Aitchison distance (Genus level)" ) ) +
     theme(axis.line = element_line(colour = "black"),
           legend.text = element_text(),
           legend.key = element_rect(fill = "transparent"),
@@ -576,24 +607,27 @@ pits_beta <- plot_ordination( physeq = ps_clr, ordination = ps_clr_ord,
           strip.background = element_rect(colour="white", fill="grey95", size=1.5, linetype="solid"))
 pits_beta
 
-beta_df_its <- vegan::adonis2(formula = ps_clr_dist ~ Diet * Disease + Prevotella + Shannon_ITS + Shannon_16s + Age + Gender + BMI,
+beta_df_its <- vegan::adonis2(formula = ps_clr_dist ~ Diet * Disease + Prevotella + Age +Gender + BMI,
                              data = data.frame(ps_clr %>% sample_data),
                              permutations = 99999) %>% data.frame() %>%
     rownames_to_column("Variable")
 beta_df_its
 
-ft_betaITS <- beta_df_its %>% 
-    # dplyr::mutate(Variable = gsub(pattern = "_", replacement = " ", x = Variable)) %>% 
-    dplyr::select(Variable, Df, SumOfSqs, R2, F, p.value = 'Pr..F.') %>% 
-    dplyr::mutate(SumOfSqs = round(SumOfSqs, 2)) %>% 
-    dplyr::mutate(R2 = round(R2, 4)) %>% 
-    dplyr::mutate(F = round(F, 4)) %>% 
-    flextable::flextable()
-
 m1 <- lm(PC1 ~ Diet * Disease + Prevotella + Shannon_ITS + Shannon_16s + Age + Gender + BMI, data = pits_beta$data)
 m2 <- lm(PC2 ~ Diet * Disease + Prevotella + Shannon_ITS + Shannon_16s + Age + Gender + BMI, data = pits_beta$data)
 summary(m1)
 summary(m2)
+
+layout <- "
+ABCCCC
+ABDDDD
+"
+pits_phylum + pits_genus + 
+    pits_alpha + pits_beta +
+    plot_layout(design = layout) +
+    plot_annotation(tag_levels = 'A') +
+    plot_annotation(title = 'ITS data') 
+ggsave(filename = "plots/plots_its.pdf", height = 9, width = 18)
 
 # Alpha 16S vs Alpha ITS --------------------------------------------------
 
@@ -632,7 +666,7 @@ means_metab <- ps_met %>%
     dplyr::arrange(Metabolite) %>%
     dplyr::select( Metabolite, Diet, Disease, Abundance) %>%
     dplyr::group_by(Metabolite, Diet, Disease) %>%
-    dplyr::reframe(mean = mean(Abundance), groups = c(Metabolite)) %>%
+    dplyr::summarise(mean = mean(Abundance), groups = c(Metabolite)) %>%
     unique() %>%
     dplyr::mutate(Metabolite = gsub(pattern = "g__", replacement = "", x = Metabolite))
 # filter(mean >= 0.02) # Filter out low abundance taxa
@@ -641,7 +675,7 @@ means_metab <- ps_met %>%
 means_metab$Metabolite[means_metab$mean < 0.02] <- "Other"
 means_metab <- means_metab %>%
     group_by(Metabolite, Diet, Disease) %>%
-    reframe(mean = sum(mean), groups = c(Metabolite)) %>%
+    summarise(mean = sum(mean), groups = c(Metabolite)) %>%
     unique()
 
 pmet_abund <- means_metab %>% 
@@ -708,7 +742,7 @@ ps_clr <- microbiome::transform(ps_met, "clr")
 
 sample_data(ps_clr)$Prevotella <- ps_ra %>% 
     microbiome::aggregate_taxa(x = ., level = "Genus") %>%
-    subset_taxa(physeq = ., Genus == "Prevotella") %>% 
+    subset_taxa(physeq = ., Genus == "g__Prevotella") %>% 
     otu_table() %>% 
     data.frame() %>% t() 
 
@@ -737,39 +771,42 @@ pmet_beta <- plot_ordination( physeq = ps_clr, ordination = ps_clr_ord,
           strip.background = element_rect(colour="white", fill="grey95", size=1.5, linetype="solid"))
 pmet_beta
 
-beta_df_met <- vegan::adonis2(formula = ps_clr_dist ~ Diet * Disease + Prevotella + Shannon_Metabolome + Age + Gender + BMI,
+beta_df_met <- vegan::adonis2(formula = ps_clr_dist ~ Diet * Disease + Prevotella + Age + Gender + BMI,
                               data = data.frame(ps_clr %>% sample_data),
                               permutations = 99999) %>% data.frame() %>%
     rownames_to_column("Variable")
 beta_df_met
-
-ft_betaMetabolome <- beta_df_met %>% 
-    # dplyr::mutate(Variable = gsub(pattern = "_", replacement = " ", x = Variable)) %>% 
-    dplyr::select(Variable, Df, SumOfSqs, R2, F, p.value = 'Pr..F.') %>% 
-    dplyr::mutate(SumOfSqs = round(SumOfSqs, 2)) %>% 
-    dplyr::mutate(R2 = round(R2, 4)) %>% 
-    dplyr::mutate(F = round(F, 4)) %>% 
-    flextable::flextable()
 
 m1 <- lm(PC1 ~ Diet * Disease + Prevotella + Shannon_Metabolome + Age + Gender + BMI, data = pmet_beta$data)
 m2 <- lm(PC2 ~ Diet * Disease + Prevotella + Shannon_Metabolome + Age + Gender + BMI, data = pmet_beta$data)
 summary(m1)
 summary(m2)
 
+layout <- "
+ABB
+ACC
+"
+pmet_abund + 
+    pmet_alpha + pmet_beta +
+    plot_layout(design = layout) +
+    plot_annotation(tag_levels = 'A') +
+    plot_annotation(title = 'Metabolome data') 
+ggsave(filename = "plots/plots_metabolome.pdf", height = 9, width = 9)
+
 # Compare diversity -------------------------------------------------------
 
 vegan::mantel(xdis = beta_16S, ydis = beta_ITS, method = "spearman", 
               permutations = 10000, parallel = 4)
-# Mantel statistic r: 0.07896 
-# Significance: 0.23538 
+# Mantel statistic r: -0.1203 
+# Significance: 0.89241 
 vegan::mantel(xdis = beta_16S, ydis = beta_Met, method = "spearman", 
               permutations = 10000, parallel = 4)
-# Mantel statistic r: 0.1382 
-# Significance: 0.074593 
+# Mantel statistic r: 0.2095 
+# Significance: 0.012599 
 vegan::mantel(xdis = beta_ITS, ydis = beta_Met, method = "spearman", 
               permutations = 10000, parallel = 4)
-# Mantel statistic r: -0.05937
-# Significance: 0.70443 
+# Mantel statistic r: -0.03797 
+# Significance: 0.62504 
 
 cor.test(x = sample_data(ps_16s)$Shannon_16s, 
          y = sample_data(ps_its)$Shannon_ITS, 
@@ -845,8 +882,4 @@ p_bmi_1 + theme( axis.text.x = element_text(angle = 0, hjust = 0.5, size=12) ) +
     p_bmi_2 + theme( axis.text.x = element_text(angle = 0, hjust = 0.5, size=12) ) +
     plot_layout(design = layout) +
     plot_annotation(tag_levels = 'A') 
-# ggsave(filename = "plots_final/Suppl_Fig_BMI.pdf", height = 4.5, width = 9)
-
-flextable::save_as_image(x = ft_beta16S,path = 'table/beta_16S.png')
-flextable::save_as_image(x = ft_betaITS,path = 'table/beta_ITS.png')
-flextable::save_as_image(x = ft_betaMetabolome,path = 'table/beta_Met.png')
+ggsave(filename = "plots_final/Suppl_Fig_BMI.pdf", height = 4.5, width = 9)
